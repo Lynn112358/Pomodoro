@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番茄钟</title>
+<style>
+  :root {
+    --bg: #f5f0eb;
+    --card: #ffffff;
+    --text: #2c2c2c;
+    --sub: #888;
+    --work: #e85d3a;
+    --break: #4caf84;
+    --long-break: #5b8cce;
+    --ring-bg: #e8e3dd;
+    --btn-bg: #f0ede8;
+    --btn-hover: #e5e1da;
+  }
+  :root.dark {
+    --bg: #1a1a1e;
+    --card: #252528;
+    --text: #e0e0e0;
+    --sub: #999;
+    --ring-bg: #333338;
+    --btn-bg: #333338;
+    --btn-hover: #44444a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: transparent;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; overflow: hidden;
+  }
+  .window {
+    width: 400px;
+    background: var(--bg);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    transition: background 0.3s;
+  }
+  .titlebar {
+    height: 38px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    -webkit-app-region: drag;
+  }
+  .titlebar .title {
+    font-size: 12px; font-weight: 600;
+    color: var(--sub);
+    letter-spacing: 1px;
+  }
+  .titlebar .actions {
+    display: flex; gap: 8px;
+    -webkit-app-region: no-drag;
+  }
+  .titlebar .actions button {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: none; cursor: pointer; padding: 0;
+  }
+  .btn-close { background: #ff5f57; }
+  .btn-min { background: #febc2e; }
+  .btn-pin { background: #28c840; }
+
+  .card {
+    padding: 20px 40px 36px;
+    text-align: center;
+  }
+  .mode-tabs {
+    display: flex; gap: 6px;
+    background: var(--btn-bg);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+  }
+  .mode-tab {
+    flex: 1;
+    padding: 8px 4px;
+    border: none; border-radius: 9px;
+    background: transparent;
+    color: var(--sub);
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mode-tab.active {
+    background: var(--card);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .timer-wrapper {
+    position: relative;
+    width: 220px; height: 220px;
+    margin: 0 auto 28px;
+  }
+  canvas { position: absolute; top: 0; left: 0; }
+  .time-display {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+  }
+  .time-text {
+    font-size: 50px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .time-label {
+    font-size: 12px; color: var(--sub);
+    margin-top: 4px; letter-spacing: 1px;
+  }
+  .controls {
+    display: flex; gap: 14px; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .btn {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--btn-bg);
+    color: var(--text);
+    transition: all 0.2s;
+  }
+  .btn:hover { background: var(--btn-hover); transform: scale(1.06); }
+  .btn:active { transform: scale(0.95); }
+  .btn-start {
+    width: 60px; height: 60px;
+    font-size: 22px; color: #fff;
+  }
+  .btn-start.work { background: var(--work); }
+  .btn-start.break { background: var(--break); }
+  .btn-start.long-break { background: var(--long-break); }
+  .footer {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--sub);
+  }
+  .theme-toggle {
+    background: none; border: none;
+    font-size: 16px; cursor: pointer; padding: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <span class="title">🍅 番茄钟</span>
+    <div class="actions">
+      <button class="btn-pin" id="pinBtn" title="置顶"></button>
+      <button class="btn-min" id="minBtn" title="最小化"></button>
+      <button class="btn-close" id="closeBtn" title="关闭"></button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="work">专注 25</button>
+      <button class="mode-tab" data-mode="short-break">小休 5</button>
+      <button class="mode-tab" data-mode="long-break">长休 15</button>
+    </div>
+
+    <div class="timer-wrapper">
+      <canvas id="ring" width="220" height="220"></canvas>
+      <div class="time-display">
+        <span class="time-text" id="time">25:00</span>
+        <span class="time-label" id="label">专注中</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="resetBtn" title="重置 (R)">↺</button>
+      <button class="btn btn-start work" id="startBtn" title="开始 / 暂停 (空格)">▶</button>
+      <button class="btn" id="skipBtn" title="跳过 (S)">⏭</button>
+    </div>
+
+    <div class="footer">
+      <span class="session-count" id="sessions">已完成 0 轮</span>
+      <button class="theme-toggle" id="themeBtn" title="切换主题">🌙</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MODES = {
+    work: { label: '专注中', minutes: 25, color: 'var(--work)' },
+    'short-break': { label: '小憩中', minutes: 5, color: 'var(--break)' },
+    'long-break': { label: '长休中', minutes: 15, color: 'var(--long-break)' },
+  };
+
+  let mode = 'work';
+  let totalSeconds = MODES.work.minutes * 60;
+  let remaining = totalSeconds;
+  let running = false;
+  let sessions = 0;
+  let intervalId = null;
+  let darkMode = false;
+
+  const timeEl = document.getElementById('time');
+  const labelEl = document.getElementById('label');
+  const startBtn = document.getElementById('startBtn');
+  const sessionsEl = document.getElementById('sessions');
+  const themeBtn = document.getElementById('themeBtn');
+  const canvas = document.getElementById('ring');
+  const ctx = canvas.getContext('2d');
+  const cx = 110, cy = 110, r = 98;
+
+  function fmt(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function getColor(v) {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue(v.replace('var(','').replace(')','')).trim();
+  }
+
+  function drawRing() {
+    ctx.clearRect(0, 0, 220, 220);
+    const pct = totalSeconds > 0 ? remaining / totalSeconds : 1;
+    const color = getColor(MODES[mode].color);
+    const ringBg = getColor('var(--ring-bg)');
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = ringBg;
+    ctx.lineWidth = 9;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    ctx.beginPath();
+    const sa = -Math.PI / 2;
+    const ea = sa + (Math.PI * 2 * pct);
+    ctx.arc(cx, cy, r, sa, ea);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 9;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    if (pct > 0 && pct < 1) {
+      const da = sa + (Math.PI * 2 * pct);
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(da) * r, cy + Math.sin(da) * r, 5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  }
+
+  function updateDisplay() {
+    timeEl.textContent = fmt(remaining);
+    drawRing();
+    document.title = `${fmt(remaining)} - ${MODES[mode].label}`;
+  }
+
+  function setMode(m) {
+    mode = m;
+    totalSeconds = MODES[m].minutes * 60;
+    remaining = totalSeconds;
+    running = false;
+    clearInterval(intervalId);
+    startBtn.textContent = '▶';
+    labelEl.textContent = MODES[m].label;
+    startBtn.className = `btn btn-start ${m}`;
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-mode="${m}"]`).classList.add('active');
+    updateDisplay();
+  }
+
+  function tick() {
+    if (remaining <= 0) { complete(); return; }
+    remaining--;
+    updateDisplay();
+  }
+
+  function complete() {
+    clearInterval(intervalId);
+    running = false;
+    startBtn.textContent = '▶';
+    remaining = 0;
+    updateDisplay();
+
+    if (mode === 'work') {
+      sessions++;
+      sessionsEl.textContent = `已完成 ${sessions} 轮`;
+    }
+
+    const msg = mode === 'work' ? '🍅 专注完成！休息一下吧～' : '休息结束，准备开始新的番茄！';
+    new Notification('番茄钟', { body: msg });
+
+    try {
+      const ac = new AudioContext();
+      [523, 659, 784].forEach((freq, i) => {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.15, ac.currentTime + i * 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.18 + 0.5);
+        osc.start(ac.currentTime + i * 0.18);
+        osc.stop(ac.currentTime + i * 0.18 + 0.5);
+      });
+    } catch (_) {}
+
+    if (mode === 'work') {
+      setMode(sessions % 4 === 0 ? 'long-break' : 'short-break');
+    } else {
+      setMode('work');
+    }
+  }
+
+  function toggleRun() {
+    if (running) {
+      running = false;
+      clearInterval(intervalId);
+      startBtn.textContent = '▶';
+    } else {
+      if (remaining <= 0) remaining = totalSeconds;
+      running = true;
+      startBtn.textContent = '⏸';
+      intervalId = setInterval(tick, 1000);
+    }
+  }
+
+  function reset() {
+    running = false;
+    clearInterval(intervalId);
+    remaining = totalSeconds;
+    startBtn.textContent = '▶';
+    updateDisplay();
+  }
+
+  function skip() {
+    if (mode === 'work') {
+      setMode(sessions % 4 === 0 ? 'long-break' : 'short-break');
+    } else {
+      setMode('work');
+    }
+  }
+
+  // Controls
+  document.getElementById('startBtn').addEventListener('click', toggleRun);
+  document.getElementById('resetBtn').addEventListener('click', reset);
+  document.getElementById('skipBtn').addEventListener('click', skip);
+  let pinned = false;
+  document.getElementById('minBtn').addEventListener('click', () => {
+    window.electronAPI?.minimize();
+  });
+  document.getElementById('closeBtn').addEventListener('click', () => {
+    window.electronAPI?.close();
+  });
+  document.getElementById('pinBtn').addEventListener('click', () => {
+    pinned = !pinned;
+    document.getElementById('pinBtn').style.opacity = pinned ? '1' : '0.4';
+    window.electronAPI?.togglePin(pinned);
+  });
+
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => setMode(tab.dataset.mode));
+  });
+
+  themeBtn.addEventListener('click', () => {
+    darkMode = !darkMode;
+    document.documentElement.classList.toggle('dark', darkMode);
+    themeBtn.textContent = darkMode ? '☀️' : '🌙';
+    updateDisplay();
+  });
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); toggleRun(); }
+    if (e.code === 'KeyR') reset();
+    if (e.code === 'KeyS') skip();
+    if (e.code === 'Digit1') setMode('work');
+    if (e.code === 'Digit2') setMode('short-break');
+    if (e.code === 'Digit3') setMode('long-break');
+  });
+
+  updateDisplay();
+</script>
+</body>
+</html>
